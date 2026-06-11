@@ -181,10 +181,10 @@
 ---
 
 ## Phase 11: Collateral & Prime Brokerage (Weeks 45–48)
-- [ ] Collateral management
-- [ ] Margin call management
-- [ ] Securities lending
-- [ ] Prime brokerage module
+- [x] Collateral management
+- [x] Margin call management
+- [x] Securities lending
+- [x] Prime brokerage module
 
 ---
 
