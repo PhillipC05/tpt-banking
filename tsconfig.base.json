@@ -1,0 +1,26 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "ES2021",
+    "module": "commonjs",
+    "lib": ["ES2021"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@tpt/shared": ["packages/shared/src/index.ts"],
+      "@tpt/database": ["packages/database/src/index.ts"],
+      "@tpt/common": ["packages/common/src/index.ts"],
+      "@tpt/auth": ["packages/auth/src/index.ts"],
+      "@tpt/kafka": ["packages/kafka/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

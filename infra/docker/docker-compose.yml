@@ -1,0 +1,179 @@
+version: '3.9'
+
+networks:
+  tpt-banking-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+  vault_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tpt-banking-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tpt_banking
+      POSTGRES_PASSWORD: tpt_banking_dev
+      POSTGRES_DB: tpt_banking
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tpt_banking -d tpt_banking"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - tpt-banking-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tpt-banking-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ""
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --loglevel notice
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tpt-banking-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: tpt-banking-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - tpt-banking-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: tpt-banking-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - tpt-banking-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: tpt-banking-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: tpt-banking-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    networks:
+      - tpt-banking-network
+
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: tpt-banking-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://0.0.0.0:8200
+    command: server -dev
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault_data:/vault/data
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://localhost:8200 || true"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tpt-banking-network
+
+  # ── Compliance app (Phase 3) — uncomment to run ─────────────────────────────
+  # compliance:
+  #   build: { context: ../.. , dockerfile: apps/compliance/Dockerfile }
+  #   container_name: tpt-banking-compliance
+  #   restart: unless-stopped
+  #   env_file: ../../.env
+  #   environment: { NODE_ENV: development, COMPLIANCE_PORT: 3002 }
+  #   depends_on: [postgres, redis]
+  #   ports: ["3002:3002"]
+  #   networks: [tpt-banking-network]
+
+  # ── Treasury app (Phase 9) — uncomment to run ───────────────────────────────
+  # treasury:
+  #   build: { context: ../.. , dockerfile: apps/treasury/Dockerfile }
+  #   container_name: tpt-banking-treasury
+  #   restart: unless-stopped
+  #   env_file: ../../.env
+  #   environment: { NODE_ENV: development, TREASURY_PORT: 3008 }
+  #   depends_on: [postgres, redis]
+  #   ports: ["3008:3008"]
+  #   networks: [tpt-banking-network]

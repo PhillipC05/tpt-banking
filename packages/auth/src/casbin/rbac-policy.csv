@@ -1,0 +1,76 @@
+# TPT Banking RBAC Policy
+# Format: p, role, resource, action
+# Format: g, child_role, parent_role (role inheritance)
+
+# ─── Role Inheritance ───────────────────────────────────────────────────────────
+g, preferred_customer, retail_customer
+g, hnw_client, preferred_customer
+g, vip_client, hnw_client
+g, teller, retail_customer
+g, admin, relationship_manager
+g, super_admin, admin
+g, super_admin, compliance_officer
+g, super_admin, trader
+
+# ─── Retail Customer Permissions ────────────────────────────────────────────────
+p, retail_customer, own_accounts, read
+p, retail_customer, own_accounts, transfer
+p, retail_customer, own_transactions, read
+p, retail_customer, own_profile, read
+p, retail_customer, own_profile, update
+p, retail_customer, statements, read
+
+# ─── Preferred Customer ─────────────────────────────────────────────────────────
+p, preferred_customer, enhanced_rates, read
+p, preferred_customer, priority_support, access
+
+# ─── HNW Client ─────────────────────────────────────────────────────────────────
+p, hnw_client, private_banking, access
+p, hnw_client, investment_accounts, manage
+p, hnw_client, bespoke_products, access
+
+# ─── VIP Client ─────────────────────────────────────────────────────────────────
+p, vip_client, family_office, access
+p, vip_client, concierge, request
+p, vip_client, entity_consolidation, read
+
+# ─── Relationship Manager ───────────────────────────────────────────────────────
+p, relationship_manager, clients, read
+p, relationship_manager, clients, update
+p, relationship_manager, accounts, read
+p, relationship_manager, transactions, read
+p, relationship_manager, rate_overrides, propose
+
+# ─── Teller ─────────────────────────────────────────────────────────────────────
+p, teller, accounts, read
+p, teller, deposits, create
+p, teller, withdrawals, create
+p, teller, customers, read
+
+# ─── Compliance Officer ─────────────────────────────────────────────────────────
+p, compliance_officer, aml_alerts, manage
+p, compliance_officer, sar_filings, manage
+p, compliance_officer, ctr_filings, manage
+p, compliance_officer, case_management, manage
+p, compliance_officer, kyc_approvals, manage
+p, compliance_officer, sanctions_screening, manage
+p, compliance_officer, all_transactions, read
+p, compliance_officer, regulatory_reports, manage
+
+# ─── Trader ─────────────────────────────────────────────────────────────────────
+p, trader, orders, create
+p, trader, orders, cancel
+p, trader, positions, read
+p, trader, market_data, read
+p, trader, trade_blotter, read
+
+# ─── Admin ──────────────────────────────────────────────────────────────────────
+p, admin, users, manage
+p, admin, roles, assign
+p, admin, fee_schedules, manage
+p, admin, system_config, read
+
+# ─── Super Admin ────────────────────────────────────────────────────────────────
+p, super_admin, system_config, manage
+p, super_admin, audit_log, read
+p, super_admin, encryption_keys, manage
