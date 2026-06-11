@@ -47,6 +47,19 @@ export const KafkaTopics = {
   NOTIFICATIONS_EMAIL: 'notifications.email',
   NOTIFICATIONS_SMS: 'notifications.sms',
   NOTIFICATIONS_PUSH: 'notifications.push',
+
+  // ─── Open Banking — outbound TPP webhooks ─────────────────────────────────
+  /** Outbound webhook deliveries to TPP callback URLs. */
+  OB_WEBHOOK_OUTBOUND: 'ob.webhook.outbound',
+  OB_PAYMENT_SETTLED: 'ob.payment.settled',
+  OB_PAYMENT_REJECTED: 'ob.payment.rejected',
+  OB_CONSENT_REVOKED: 'ob.consent.revoked',
+
+  // ─── Integration framework — inbound provider webhooks ───────────────────
+  /** Inbound provider webhooks that have passed signature validation. */
+  INTEGRATION_WEBHOOK_RECEIVED: 'integration.webhook.received',
+  /** Dead-letter queue for inbound webhooks that failed handler processing 3× */
+  INTEGRATION_WEBHOOK_DLQ: 'integration.webhook.dlq',
 } as const;
 
 export type KafkaTopic = (typeof KafkaTopics)[keyof typeof KafkaTopics];

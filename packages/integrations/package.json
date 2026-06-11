@@ -1,0 +1,23 @@
+{
+  "name": "@tpt/integrations",
+  "version": "0.1.0",
+  "description": "TPT Banking — shared integration framework: provider adapters, circuit breaker, webhook validation, provider registry",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/axios": "^3.0.0",
+    "@nestjs/config": "^3.0.0",
+    "@nestjs-modules/ioredis": "^2.0.2",
+    "axios": "^1.6.0",
+    "ioredis": "^5.3.2",
+    "rxjs": "^7.8.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.1.3"
+  }
+}

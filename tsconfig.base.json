@@ -19,7 +19,8 @@
       "@tpt/database": ["packages/database/src/index.ts"],
       "@tpt/common": ["packages/common/src/index.ts"],
       "@tpt/auth": ["packages/auth/src/index.ts"],
-      "@tpt/kafka": ["packages/kafka/src/index.ts"]
+      "@tpt/kafka": ["packages/kafka/src/index.ts"],
+      "@tpt/integrations": ["packages/integrations/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
