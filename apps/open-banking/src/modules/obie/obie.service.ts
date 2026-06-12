@@ -1,6 +1,6 @@
 import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import {
   OpenBankingConsent, ConsentStatus, ConsentType, Account, LedgerEntry,
 } from '@tpt/database';
@@ -115,7 +115,7 @@ export class ObieService {
 
     const accountIds = consent.authorisedAccountIds;
     const accounts = accountIds.length > 0
-      ? await this.accountRepo.findByIds(accountIds)
+      ? await this.accountRepo.find({ where: { id: In(accountIds) } })
       : await this.accountRepo.find({ where: { customerId: consent.customerId! } });
 
     return {
@@ -131,6 +131,7 @@ export class ObieService {
     const consent = await this.resolveTokenToConsent(authHeader);
     const account = await this.accountRepo.findOne({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException(`Account not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     return {
       Data: { Account: [this.formatAccountObie(account)] },
@@ -140,9 +141,10 @@ export class ObieService {
   }
 
   async getBalances(authHeader: string, accountId: string): Promise<Record<string, unknown>> {
-    await this.resolveTokenToConsent(authHeader);
+    const consent = await this.resolveTokenToConsent(authHeader);
     const account = await this.accountRepo.findOne({ where: { id: accountId } });
     if (!account) throw new UnauthorizedException(`Account not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     const balance = Money.fromDecimalString(account.balance, account.currency);
     const available = Money.fromDecimalString(account.availableBalance, account.currency);
@@ -177,7 +179,10 @@ export class ObieService {
     from?: string,
     to?: string,
   ): Promise<Record<string, unknown>> {
-    await this.resolveTokenToConsent(authHeader);
+    const consent = await this.resolveTokenToConsent(authHeader);
+    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    if (!account) throw new UnauthorizedException(`Account not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     const qb = this.ledgerRepo
       .createQueryBuilder('entry')
@@ -190,7 +195,6 @@ export class ObieService {
     if (to) qb.andWhere('entry.createdAt <= :to', { to: new Date(to) });
 
     const entries = await qb.getMany();
-    const account = await this.accountRepo.findOne({ where: { id: accountId } });
 
     return {
       Data: {

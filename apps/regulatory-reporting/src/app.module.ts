@@ -10,6 +10,7 @@ import { FinraModule } from './modules/finra/finra.module';
 import { SecModule } from './modules/sec/sec.module';
 import { FincenModule } from './modules/fincen/fincen.module';
 import { ReportSchedulerModule } from './modules/scheduler/scheduler.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ReportSchedulerModule } from './modules/scheduler/scheduler.module';
     SecModule,
     FincenModule,
     ReportSchedulerModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

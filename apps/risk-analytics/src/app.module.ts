@@ -9,6 +9,7 @@ import { GreeksModule } from './modules/greeks/greeks.module';
 import { CreditRiskModule } from './modules/credit-risk/credit-risk.module';
 import { CvaModule } from './modules/cva/cva.module';
 import { LiquidityModule } from './modules/liquidity/liquidity.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { LiquidityModule } from './modules/liquidity/liquidity.module';
     CreditRiskModule,
     CvaModule,
     LiquidityModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

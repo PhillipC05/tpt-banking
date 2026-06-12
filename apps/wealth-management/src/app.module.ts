@@ -7,6 +7,7 @@ import { PrivateBankingModule } from './modules/private-banking/private-banking.
 import { FamilyOfficeModule } from './modules/family-office/family-office.module';
 import { RoboAdvisorModule } from './modules/robo-advisor/robo-advisor.module';
 import { TrustEstateModule } from './modules/trust-estate/trust-estate.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { TrustEstateModule } from './modules/trust-estate/trust-estate.module';
     FamilyOfficeModule,
     RoboAdvisorModule,
     TrustEstateModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

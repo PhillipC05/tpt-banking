@@ -7,6 +7,7 @@ import { CollateralManagementModule } from './modules/collateral-management/coll
 import { MarginCallModule } from './modules/margin-call/margin-call.module';
 import { SecuritiesLendingModule } from './modules/securities-lending/securities-lending.module';
 import { PrimeBrokerageModule } from './modules/prime-brokerage/prime-brokerage.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PrimeBrokerageModule } from './modules/prime-brokerage/prime-brokerage.
     MarginCallModule,
     SecuritiesLendingModule,
     PrimeBrokerageModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

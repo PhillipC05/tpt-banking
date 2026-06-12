@@ -21,7 +21,8 @@
       "@tpt/auth": ["packages/auth/src/index.ts"],
       "@tpt/kafka": ["packages/kafka/src/index.ts"],
       "@tpt/integrations": ["packages/integrations/src/index.ts"],
-      "@tpt/vault": ["packages/vault/src/index.ts"]
+      "@tpt/vault": ["packages/vault/src/index.ts"],
+      "@tpt/telemetry": ["packages/telemetry/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

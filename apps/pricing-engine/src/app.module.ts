@@ -10,6 +10,7 @@ import { RatesModule } from './modules/rates/rates.module';
 import { CreditModule } from './modules/credit/credit.module';
 import { FxModule } from './modules/fx/fx.module';
 import { PricingGatewayModule } from './modules/gateway/pricing-gateway.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PricingGatewayModule } from './modules/gateway/pricing-gateway.module';
     CreditModule,
     FxModule,
     PricingGatewayModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

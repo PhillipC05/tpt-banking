@@ -11,6 +11,7 @@ import { FdxModule } from './modules/fdx/fdx.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { VrpModule } from './modules/vrp/vrp.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { VrpModule } from './modules/vrp/vrp.module';
     Psd2Module,
     FdxModule,
     VrpModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

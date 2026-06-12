@@ -1,7 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { OpenBankingConsent, ConsentStatus, ConsentType, Account, LedgerEntry } from '@tpt/database';
+import { v4 as uuidv4 } from 'uuid';
+import { OAuth2Service } from '../oauth2/oauth2.service';
+import { PaymentBridgeService } from '../obie/payment-bridge.service';
 
 // FDX data cluster codes
 const FDX_DATA_CLUSTERS = {
@@ -29,7 +32,19 @@ export class FdxService {
     private readonly accountRepo: Repository<Account>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
+    private readonly oauth2Service: OAuth2Service,
+    private readonly paymentBridge: PaymentBridgeService,
   ) {}
+
+  private async resolveTokenToConsent(authorization: string): Promise<OpenBankingConsent> {
+    const token = authorization?.replace('Bearer ', '');
+    if (!token) throw new UnauthorizedException('Missing Bearer token');
+    const introspection = await this.oauth2Service.introspectToken(token, '*');
+    if (!introspection.active || !introspection.consent_id) throw new UnauthorizedException('Invalid or expired token');
+    const consent = await this.consentRepo.findOne({ where: { consentId: introspection.consent_id } });
+    if (!consent || consent.status !== ConsentStatus.AUTHORISED) throw new UnauthorizedException('Consent not active');
+    return consent;
+  }
 
   async createConsent(
     authorization: string,
@@ -97,7 +112,11 @@ export class FdxService {
   }
 
   async getAccounts(authorization: string): Promise<Record<string, unknown>> {
-    const accounts = await this.accountRepo.find({ take: 100 });
+    const consent = await this.resolveTokenToConsent(authorization);
+    const accountIds = consent.authorisedAccountIds ?? [];
+    const accounts = accountIds.length > 0
+      ? await this.accountRepo.find({ where: { id: In(accountIds) } })
+      : await this.accountRepo.find({ where: { customerId: consent.customerId! } });
 
     return {
       accounts: accounts.map((a) => ({
@@ -116,8 +135,10 @@ export class FdxService {
   }
 
   async getAccount(authorization: string, accountId: string): Promise<Record<string, unknown>> {
+    const consent = await this.resolveTokenToConsent(authorization);
     const account = await this.accountRepo.findOne({ where: { id: accountId } });
     if (!account) throw new NotFoundException(`Account ${accountId} not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     return {
       accountId: account.id,
@@ -141,6 +162,11 @@ export class FdxService {
     offset = 0,
     limit = 50,
   ): Promise<Record<string, unknown>> {
+    const consent = await this.resolveTokenToConsent(authorization);
+    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    if (!account) throw new NotFoundException(`Account ${accountId} not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
+
     const qb = this.ledgerRepo
       .createQueryBuilder('entry')
       .where('entry.accountId = :accountId', { accountId })
@@ -182,10 +208,27 @@ export class FdxService {
       memo?: string;
     },
   ): Promise<Record<string, unknown>> {
-    const paymentId = `FDX-${Date.now()}`;
+    const consent = await this.resolveTokenToConsent(authorization);
+    const idempotencyKey = `FDX-${uuidv4()}`;
+
+    const { obPaymentId, status } = await this.paymentBridge.submitDomesticPayment(
+      {
+        consentId: consent.consentId,
+        initiation: {
+          InstructedAmount: { Amount: body.amount.value, Currency: body.amount.currencyCode },
+          CreditorAccount: { Identification: body.creditorAccount.accountNumber },
+          RemittanceInformation: { Unstructured: body.memo ?? '' },
+        },
+      },
+      idempotencyKey,
+    );
+
+    const fdxStatus = status === 'AcceptedSettlementInProcess' ? 'PROCESSING'
+      : status === 'AcceptedSettlementCompleted' ? 'PROCESSED' : 'PENDING';
+
     return {
-      paymentId,
-      status: 'PENDING',
+      paymentId: obPaymentId,
+      status: fdxStatus,
       paymentType: body.paymentType,
       amount: body.amount,
       createdTime: new Date().toISOString(),

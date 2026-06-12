@@ -9,6 +9,7 @@ import { CashPoolingModule } from './modules/cash-pooling/cash-pooling.module';
 import { InterestRateRiskModule } from './modules/interest-rate-risk/interest-rate-risk.module';
 import { NostroModule } from './modules/nostro/nostro.module';
 import { CorrespondentModule } from './modules/correspondent/correspondent.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CorrespondentModule } from './modules/correspondent/correspondent.modul
     InterestRateRiskModule,
     NostroModule,
     CorrespondentModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

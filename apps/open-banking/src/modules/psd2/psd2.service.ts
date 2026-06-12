@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { OpenBankingConsent, ConsentStatus, ConsentType, Account, LedgerEntry } from '@tpt/database';
 import { Money } from '@tpt/shared';
 import { PaymentBridgeService } from '../obie/payment-bridge.service';
@@ -87,7 +87,7 @@ export class Psd2Service {
     const consent = await this.findActiveConsent(consentId);
 
     const accounts = consent.authorisedAccountIds?.length > 0
-      ? await this.accountRepo.findByIds(consent.authorisedAccountIds)
+      ? await this.accountRepo.find({ where: { id: In(consent.authorisedAccountIds) } })
       : await this.accountRepo.find({ where: { customerId: consent.customerId! } });
 
     return {
@@ -108,9 +108,10 @@ export class Psd2Service {
   }
 
   async getBalances(consentId: string, accountId: string): Promise<Record<string, unknown>> {
-    await this.findActiveConsent(consentId);
+    const consent = await this.findActiveConsent(consentId);
     const account = await this.accountRepo.findOne({ where: { id: accountId } });
     if (!account) throw new NotFoundException(`Account ${accountId} not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     return {
       account: { iban: `GB${account.accountNumber.padStart(22, '0')}` },
@@ -135,7 +136,10 @@ export class Psd2Service {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<Record<string, unknown>> {
-    await this.findActiveConsent(consentId);
+    const consent = await this.findActiveConsent(consentId);
+    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    if (!account) throw new NotFoundException(`Account ${accountId} not found`);
+    if (account.customerId !== consent.customerId) throw new UnauthorizedException('Account not accessible under this consent');
 
     const qb = this.ledgerRepo
       .createQueryBuilder('entry')
@@ -233,6 +237,7 @@ export class Psd2Service {
     const bban = body.account.iban.replace(/^GB0*/, '');
     const account = await this.accountRepo.findOne({ where: { accountNumber: bban } });
     if (!account) throw new BadRequestException(`Account with IBAN ${body.account.iban} not found`);
+    if (account.customerId !== consent.customerId) throw new BadRequestException('IBAN does not match consent holder');
 
     const available = Money.fromDecimalString(account.availableBalance, account.currency);
     const fundsAvailable = available.amount.gte(requested.amount);
@@ -250,6 +255,10 @@ export class Psd2Service {
     const consent = await this.findConsent(consentId);
     if (consent.status !== ConsentStatus.AUTHORISED) {
       throw new NotFoundException(`Consent ${consentId} is not authorised`);
+    }
+    if (consent.expiresAt && consent.expiresAt < new Date()) {
+      await this.consentRepo.update(consent.id, { status: ConsentStatus.EXPIRED });
+      throw new NotFoundException(`Consent ${consentId} has expired`);
     }
     return consent;
   }

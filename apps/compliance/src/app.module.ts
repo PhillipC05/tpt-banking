@@ -12,6 +12,7 @@ import { CtrModule } from './modules/ctr/ctr.module';
 // Phase 3b
 import { CddModule } from './modules/cdd/cdd.module';
 import { EddModule } from './modules/edd/edd.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { EddModule } from './modules/edd/edd.module';
     // Phase 3b
     CddModule,
     EddModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

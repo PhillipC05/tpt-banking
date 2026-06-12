@@ -10,6 +10,7 @@ import { ExecutionsModule } from './modules/executions/executions.module';
 import { PositionsModule } from './modules/positions/positions.module';
 import { TradingDeskModule } from './modules/trading-desk/trading-desk.module';
 import { TradeLifecycleModule } from './modules/trade-lifecycle/trade-lifecycle.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TradeLifecycleModule } from './modules/trade-lifecycle/trade-lifecycle.
     PositionsModule,
     TradingDeskModule,
     TradeLifecycleModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
