@@ -29,6 +29,7 @@ nx serve risk-analytics    # port 3006
 nx serve regulatory-reporting # port 3007
 nx serve treasury          # port 3008
 nx serve wealth-management # port 3009
+nx dev web                 # port 3010 (Next.js frontend)
 
 # Build
 npm run build              # build all apps and packages
@@ -151,6 +152,7 @@ All topic names are constants in `packages/kafka/src/topics.ts` (`KafkaTopics`).
 | 3007 | regulatory-reporting |
 | 3008 | treasury |
 | 3009 | wealth-management |
+| 3010 | web (Next.js frontend) |
 | 5432 | PostgreSQL |
 | 6379 | Redis |
 | 9092 | Kafka (host) |

@@ -13,7 +13,6 @@
     "lib": ["ES2021"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "baseUrl": ".",
     "paths": {
       "@tpt/shared": ["packages/shared/src/index.ts"],
       "@tpt/database": ["packages/database/src/index.ts"],

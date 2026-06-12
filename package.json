@@ -22,6 +22,7 @@
     "test:integration": "DATABASE_NAME=tpt_banking_test nx test database --config=jest.config.ts"
   },
   "devDependencies": {
+    "tslib": "^2.6.0",
     "@nx/eslint": "^18.0.0",
     "@nx/jest": "^18.0.0",
     "@nx/nest": "^18.0.0",

@@ -33,12 +33,12 @@ async function bootstrap(): Promise<void> {
   }));
   app.use(compression());
 
-  const corsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3002').split(',');
+  const corsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3002,http://localhost:3010').split(',');
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Step-Up-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Step-Up-Token', 'X-Request-ID'],
   });
 
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
