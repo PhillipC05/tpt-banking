@@ -7,6 +7,7 @@ import { PrivateBankingModule } from './modules/private-banking/private-banking.
 import { FamilyOfficeModule } from './modules/family-office/family-office.module';
 import { RoboAdvisorModule } from './modules/robo-advisor/robo-advisor.module';
 import { TrustEstateModule } from './modules/trust-estate/trust-estate.module';
+import { PersonalOfficeModule } from './modules/personal-office/personal-office.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { HealthModule } from './modules/health/health.module';
     FamilyOfficeModule,
     RoboAdvisorModule,
     TrustEstateModule,
+    PersonalOfficeModule,
     HealthModule,
   ],
 })
