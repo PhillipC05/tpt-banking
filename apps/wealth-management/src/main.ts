@@ -1,5 +1,8 @@
 import 'reflect-metadata';
+import { initTelemetry } from '@tpt/telemetry';
+initTelemetry('wealth-management');
 import { NestFactory, Reflector } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -13,7 +16,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.useGlobalGuards(new RolesGuard(app.get(Reflector)));
-  app.setGlobalPrefix('v1');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   const config = new DocumentBuilder()
     .setTitle('TPT Banking — Wealth Management API')

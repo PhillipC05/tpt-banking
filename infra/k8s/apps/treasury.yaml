@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: treasury
+  namespace: tpt-banking
+  labels:
+    app: treasury
+spec:
+  selector:
+    app: treasury
+  ports:
+    - name: http
+      port: 3008
+      targetPort: 3008
+    - name: metrics
+      port: 9472
+      targetPort: 9472
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treasury
+  namespace: tpt-banking
+  labels:
+    app: treasury
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: treasury
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: treasury
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9472"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: treasury
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: treasury
+          image: tpt-banking/treasury:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3008
+            - containerPort: 9472
+          envFrom:
+            - configMapRef:
+                name: tpt-banking-config
+            - secretRef:
+                name: tpt-banking-secrets
+          env:
+            - name: PORT
+              value: "3008"
+            - name: PROMETHEUS_PORT
+              value: "9472"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 3008
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 3008
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: treasury
+  namespace: tpt-banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: treasury
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

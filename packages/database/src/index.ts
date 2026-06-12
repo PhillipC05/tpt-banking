@@ -7,6 +7,7 @@ export { Phase2Schema1700000002000 } from './migrations/1700000002000-Phase2Sche
 export { Phase3ComplianceSchema1700000003000 } from './migrations/1700000003000-Phase3ComplianceSchema';
 export { Phase4RealtimeOpenBanking1700000004000 } from './migrations/1700000004000-Phase4RealtimeOpenBanking';
 export { Phase5InvestmentBanking1700000005000 } from './migrations/1700000005000-Phase5InvestmentBanking';
+export { PiiColumnEncryption1700000006000 } from './migrations/1700000006000-PiiColumnEncryption';
 export {
   Customer,
   CustomerStatus,
@@ -29,3 +30,12 @@ export { AmlAlert, AmlAlertStatus, AmlAlertSeverity, AmlRuleCode } from './entit
 export { ComplianceCase, CaseType, CaseStatus, CasePriority } from './entities/compliance-case.entity';
 export { Sar, SarStatus, SarSuspiciousActivityType } from './entities/sar.entity';
 export { Ctr, CtrStatus } from './entities/ctr.entity';
+// Phase 2b — Collections + Disputes
+export { CollectionCase, CollectionCaseStatus } from './entities/collection-case.entity';
+export { WorkoutPlan, WorkoutPlanType, WorkoutPlanStatus } from './entities/workout-plan.entity';
+export { CardDispute, DisputeReason, DisputeStatus } from './entities/card-dispute.entity';
+// Phase 3b — CDD / EDD
+export { CddAssessment, CddRiskRating, CddSourceOfFunds, CddStatus } from './entities/cdd-assessment.entity';
+export { EddQuestionnaire, EddStatus, SeniorManagerApproval } from './entities/edd-questionnaire.entity';
+// Phase 2b/3b migration
+export { Phase2bPhase3bSchema1700000007000 } from './migrations/1700000007000-Phase2bPhase3bSchema';

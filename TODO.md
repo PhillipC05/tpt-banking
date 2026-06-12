@@ -66,13 +66,13 @@
 - [x] Loan origination module (`loans/loans.service.ts` — application, DTOs)
 - [x] Loan underwriting module (rules-based decision in `loans.service.ts`)
 - [x] Loan amortization + servicing (amortization engine, payment schedule, disbursement)
-- [ ] Collections module (delinquency tracking, workout plans — Phase 2b)
+- [x] Collections module (delinquency tracking, workout plans — Phase 2b)
 - [x] ACH payments via Plaid SDK (`payments/ach/`, `payments/plaid/plaid.service.ts`)
 - [x] Wire/SWIFT payments (`payments/wire/wire.service.ts` — domestic Fedwire + international SWIFT)
 - [x] Debit card module (Stripe Issuing — `cards/cards.service.ts`, `stripe-issuing.service.ts`)
 - [x] Credit card module (Stripe Issuing — same service, CardType.CREDIT)
 - [x] Card authorization module (processAuthorization, clearTransaction in cards.service.ts)
-- [ ] Dispute management (Phase 2b — Stripe dispute webhook handling)
+- [x] Dispute management (Phase 2b — Stripe dispute webhook handling)
 - [x] Statement generation (`statements/statements.service.ts` — monthly statements)
 - [x] Notifications module (`notifications/notifications.service.ts` — email stub + Twilio SMS)
 
@@ -80,8 +80,8 @@
 
 ## Phase 3: KYC / AML / Compliance (Weeks 9–12)
 - [x] KYC workflow — Jumio adapter (`kyc/providers/jumio.service.ts`) + Onfido adapter (`onfido.service.ts`) — provider toggled by `KYC_PROVIDER` env var
-- [ ] CDD (Customer Due Diligence) module — extend KYC with risk rating (Phase 3b)
-- [ ] EDD (Enhanced Due Diligence) module — enhanced questionnaire for HNW/VIP (Phase 3b)
+- [x] CDD (Customer Due Diligence) module — extend KYC with risk rating (Phase 3b)
+- [x] EDD (Enhanced Due Diligence) module — enhanced questionnaire for HNW/VIP (Phase 3b)
 - [x] OFAC / Sanctions screening — ComplyAdvantage SDK (`screening/comply-advantage.service.ts`)
 - [x] PEP screening — same ComplyAdvantage service, different filter set
 - [x] AML transaction monitoring rules engine — 7 rules: CTR threshold, structuring, velocity, large wire, high-risk jurisdiction, round dollar (`aml/rules/aml-rules.engine.ts`)
@@ -189,21 +189,21 @@
 ---
 
 ## Phase 12: Production Hardening (Weeks 49–52)
-- [ ] OpenTelemetry observability (traces, metrics, logs)
-- [ ] Kubernetes manifests
-- [ ] k6 load tests (target: 10k TPS ACH batch)
-- [ ] DR runbooks
-- [ ] Pen test remediation
-- [ ] SOC 2 controls checklist
+- [x] OpenTelemetry observability (traces, metrics, logs)
+- [x] Kubernetes manifests
+- [x] k6 load tests (target: 10k TPS ACH batch)
+- [x] DR runbooks
+- [x] Pen test remediation
+- [x] SOC 2 controls checklist
 
 ---
 
 ## Cross-Cutting (ongoing)
-- [ ] Immutable audit log (Kafka `audit.log` topic, 7-year retention)
-- [ ] PII encryption at column level (Vault-managed keys)
-- [ ] API versioning strategy (`/v1/`, `/v2/`)
-- [ ] Rate limiting tuning per endpoint tier
-- [ ] Swagger / OpenAPI spec auto-generation for all apps
-- [ ] Jest unit tests — all domain logic
-- [ ] Integration tests — all DB operations (real PostgreSQL, no mocks)
+- [x] Immutable audit log (Kafka `audit.log` topic, 7-year retention)
+- [x] PII encryption at column level (Vault-managed keys)
+- [x] API versioning strategy (`/v1/`, `/v2/`)
+- [x] Rate limiting tuning per endpoint tier
+- [x] Swagger / OpenAPI spec auto-generation for all apps
+- [x] Jest unit tests — all domain logic
+- [x] Integration tests — all DB operations (real PostgreSQL, no mocks)
 - [ ] CI/CD pipeline (GitHub Actions)

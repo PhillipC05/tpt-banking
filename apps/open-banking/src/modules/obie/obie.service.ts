@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -6,6 +6,8 @@ import {
 } from '@tpt/database';
 import { Money } from '@tpt/shared';
 import { OAuth2Service } from '../oauth2/oauth2.service';
+import { PaymentBridgeService } from './payment-bridge.service';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service';
 
 /**
  * UK OBIE v3.1 resource server.
@@ -23,6 +25,8 @@ export class ObieService {
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
     private readonly oauth2Service: OAuth2Service,
+    private readonly paymentBridge: PaymentBridgeService,
+    private readonly webhookDelivery: WebhookDeliveryService,
   ) {}
 
   private async resolveTokenToConsent(authHeader: string): Promise<OpenBankingConsent> {
@@ -244,32 +248,106 @@ export class ObieService {
   async submitPayment(
     authHeader: string,
     idempotencyKey: string,
-    body: { Data: { ConsentId: string; Initiation: Record<string, unknown> }; Risk: Record<string, unknown> },
+    body: {
+      Data: {
+        ConsentId: string;
+        Initiation: {
+          InstructedAmount: { Amount: string; Currency: string };
+          CreditorAccount:  { Identification: string; Name?: string };
+          CreditorName?:    string;
+          RemittanceInformation?: { Reference?: string; Unstructured?: string };
+        };
+      };
+      Risk: Record<string, unknown>;
+    },
   ): Promise<Record<string, unknown>> {
-    const consent = await this.resolveTokenToConsent(authHeader);
+    await this.resolveTokenToConsent(authHeader);
+
+    const { obPaymentId, status } = await this.paymentBridge.submitDomesticPayment(
+      { consentId: body.Data.ConsentId, initiation: body.Data.Initiation },
+      idempotencyKey,
+    );
+
+    // Async notification — does not block response
+    void this.webhookDelivery.queueDelivery('payment.pending', {
+      paymentId: obPaymentId,
+      consentId: body.Data.ConsentId,
+      status,
+    });
 
     return {
       Data: {
-        DomesticPaymentId: `OBIE-${Date.now()}`,
-        ConsentId: body.Data.ConsentId,
-        Status: 'AcceptedSettlementInProcess',
-        CreationDateTime: new Date().toISOString(),
+        DomesticPaymentId:   obPaymentId,
+        ConsentId:           body.Data.ConsentId,
+        Status:              status,
+        CreationDateTime:    new Date().toISOString(),
         StatusUpdateDateTime: new Date().toISOString(),
-        Initiation: body.Data.Initiation,
+        Initiation:          body.Data.Initiation,
       },
-      Links: { Self: `/open-banking/v3.1/pisp/domestic-payments/OBIE-${Date.now()}` },
+      Links: { Self: `/open-banking/v3.1/pisp/domestic-payments/${obPaymentId}` },
       Meta: {},
     };
   }
 
   async getPaymentStatus(paymentId: string): Promise<Record<string, unknown>> {
+    const status = await this.paymentBridge.getPaymentStatus(paymentId);
     return {
       Data: {
-        DomesticPaymentId: paymentId,
-        Status: 'AcceptedSettlementCompleted',
+        DomesticPaymentId:    paymentId,
+        Status:               status,
         StatusUpdateDateTime: new Date().toISOString(),
       },
       Links: { Self: `/open-banking/v3.1/pisp/domestic-payments/${paymentId}` },
+      Meta: {},
+    };
+  }
+
+  // ── Confirmation of Funds (OBIE CBPII / PSD2 Art.65) ─────────────────────
+
+  async confirmFunds(
+    authHeader: string,
+    body: {
+      Data: {
+        ConsentId:       string;
+        Reference:       string;
+        InstructedAmount: { Amount: string; Currency: string };
+      };
+    },
+  ): Promise<Record<string, unknown>> {
+    const consent = await this.resolveTokenToConsent(authHeader);
+
+    if (!consent.permissions.includes('ReadFundsConfirmations') &&
+        !consent.permissions.includes('payments')) {
+      throw new BadRequestException('Consent does not include ReadFundsConfirmations permission');
+    }
+
+    const requested = new Money(
+      body.Data.InstructedAmount.Amount,
+      body.Data.InstructedAmount.Currency,
+    );
+
+    const accountId = consent.authorisedAccountIds?.[0];
+    if (!accountId) {
+      throw new BadRequestException('No authorised account on consent');
+    }
+
+    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new BadRequestException('Authorised account not found');
+    }
+
+    const available = Money.fromDecimalString(account.availableBalance, account.currency);
+    const fundsAvailable = available.amount.gte(requested.amount);
+
+    return {
+      Data: {
+        FundsAvailableResult: {
+          FundsAvailable: fundsAvailable,
+          FundsAvailableDateTime: new Date().toISOString(),
+          Reference: body.Data.Reference,
+        },
+      },
+      Links: { Self: '/open-banking/v3.1/cbpii/funds-confirmations' },
       Meta: {},
     };
   }

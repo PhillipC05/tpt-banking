@@ -12,6 +12,8 @@
     "@tpt/common": "*",
     "@tpt/database": "*",
     "@tpt/shared": "*",
+    "@tpt/kafka": "*",
+    "@tpt/integrations": "*",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/config": "^3.0.0",
@@ -31,7 +33,12 @@
     "class-transformer": "^0.5.1",
     "uuid": "^9.0.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@nestjs/microservices": "^10.0.0",
+    "@nestjs/axios": "^3.0.0",
+    "axios": "^1.6.0",
+    "kafkajs": "^2.2.4",
+    "jose": "^5.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",

@@ -17,6 +17,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { CardsModule } from './modules/cards/cards.module';
 import { StatementsModule } from './modules/statements/statements.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+// Phase 2b
+import { CollectionsModule } from './modules/collections/collections.module';
 
 @Module({
   imports: [
@@ -71,6 +73,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     CardsModule,
     StatementsModule,
     NotificationsModule,
+    // Feature modules — Phase 2b
+    CollectionsModule,
   ],
 })
 export class AppModule {}

@@ -6,8 +6,11 @@
   "types": "src/index.ts",
   "dependencies": {
     "@tpt/shared": "*",
+    "@tpt/kafka": "*",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/microservices": "^10.0.0",
+    "@nestjs/throttler": "^5.0.0",
     "class-validator": "^0.14.0",
     "class-transformer": "^0.5.0",
     "ioredis": "^5.3.0",

@@ -126,4 +126,22 @@ export class Psd2Controller {
   getPaymentStatusOnly(@Param('paymentId') paymentId: string) {
     return this.psd2Service.getPaymentStatusOnly(paymentId);
   }
+
+  // ── Confirmation of Funds (PSD2 Art.65) ──────────────────────────────────
+
+  @Post('funds-confirmations')
+  @ApiOperation({
+    summary: 'Confirmation of Funds — PSD2 Art.65',
+    description: 'Checks whether a specified amount is available on the debtor account. Requires CBPII consent.',
+  })
+  @ApiHeader({ name: 'Consent-ID', required: true })
+  confirmFunds(
+    @Headers('consent-id') consentId: string,
+    @Body() body: {
+      account: { iban: string };
+      instructedAmount: { currency: string; amount: string };
+    },
+  ) {
+    return this.psd2Service.confirmFunds(consentId, body);
+  }
 }

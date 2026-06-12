@@ -1,9 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards, SetMetadata } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
 import { OpenBankingStandard, TppType } from '@tpt/database';
 import { JwtAuthGuard, Roles, RolesGuard, Role } from '@tpt/auth';
 import { IsArray, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+
+const IS_PUBLIC_KEY = 'isPublic';
+const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 class RegisterClientDto {
   @IsString() clientName!: string;
@@ -50,5 +53,31 @@ export class ClientsController {
   @ApiOperation({ summary: 'Suspend an active TPP client' })
   suspend(@Param('clientId') clientId: string) {
     return this.clientsService.suspend(clientId);
+  }
+
+  // ── Dynamic Client Registration (RFC 7591) — unauthenticated ─────────────
+
+  @Post('register')
+  @Public()
+  @UseGuards()  // override class-level guards — DCR is unauthenticated per RFC 7591
+  @ApiOperation({
+    summary: 'Dynamic Client Registration — RFC 7591 (unauthenticated)',
+    description: 'Self-service TPP onboarding. Accepts an optional software_statement JWT (SSA). Client is activated immediately.',
+  })
+  dynamicRegister(
+    @Body() body: {
+      software_statement?: string;
+      redirect_uris:       string[];
+      grant_types?:        string[];
+      scope?:              string;
+      client_name?:        string;
+      logo_uri?:           string;
+      policy_uri?:         string;
+      tos_uri?:            string;
+      jwks_uri?:           string;
+      token_endpoint_auth_method?: string;
+    },
+  ) {
+    return this.clientsService.dynamicRegister(body);
   }
 }

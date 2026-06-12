@@ -115,6 +115,36 @@ services:
     networks:
       - tpt-banking-network
 
+  # ── Kafka topic init — creates audit.log with 7-year retention ──────────────
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: tpt-banking-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    # 7 years = 7 * 365 * 24 * 60 * 60 * 1000 = 220752000000 ms
+    # retention.bytes=-1 means unlimited size (time-only retention)
+    entrypoint: >
+      bash -c "
+        echo 'Waiting for Kafka to be ready...' &&
+        kafka-topics --bootstrap-server kafka:29092 --list &&
+        echo 'Creating audit.log topic with 7-year retention...' &&
+        kafka-topics --bootstrap-server kafka:29092
+          --create --if-not-exists
+          --topic audit.log
+          --partitions 6
+          --replication-factor 1
+          --config retention.ms=220752000000
+          --config retention.bytes=-1
+          --config cleanup.policy=delete
+          --config min.insync.replicas=1 &&
+        echo 'audit.log topic ready.' &&
+        kafka-topics --bootstrap-server kafka:29092 --describe --topic audit.log
+      "
+    networks:
+      - tpt-banking-network
+    restart: "no"
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: tpt-banking-kafka-ui
@@ -153,6 +183,52 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - tpt-banking-network
+
+  # ── Observability stack (Phase 12) ──────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: tpt-banking-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    networks:
+      - tpt-banking-network
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: tpt-banking-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    networks:
+      - tpt-banking-network
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: tpt-banking-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: tpt_grafana_dev
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "3300:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - jaeger
     networks:
       - tpt-banking-network
 

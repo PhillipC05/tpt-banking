@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tpt/shared": "*",
+    "@tpt/vault": "*",
     "typeorm": "^0.3.0",
     "pg": "^8.11.0",
     "reflect-metadata": "^0.1.13",

@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { ProviderAdapter, CircuitBreaker } from '@tpt/integrations';
 
 export interface ComplyAdvantageSearchParams {
   name: string;
@@ -9,7 +10,7 @@ export interface ComplyAdvantageSearchParams {
   nationality?: string;
   searchType: 'INDIVIDUAL' | 'COMPANY';
   filters?: {
-    types?: string[];  // ['sanction', 'warning', 'fitness-probity', 'pep']
+    types?: string[];
     exactMatch?: boolean;
   };
 }
@@ -36,20 +37,17 @@ const HIGH_RISK_JURISDICTIONS = new Set([
   'IR', 'KP', 'SY', 'CU', 'SD', 'MM', 'LY', 'BY', 'RU', 'VE',
 ]);
 
-/**
- * ComplyAdvantage API adapter.
- * Handles sanctions (OFAC, EU, UN, HMT), PEP, and adverse media screening.
- */
 @Injectable()
-export class ComplyAdvantageService {
-  private readonly logger = new Logger(ComplyAdvantageService.name);
+export class ComplyAdvantageService extends ProviderAdapter {
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly circuitBreaker = new CircuitBreaker('comply-advantage');
 
   constructor(
     private readonly config: ConfigService,
-    private readonly http: HttpService,
+    http: HttpService,
   ) {
+    super(http);
     this.baseUrl = this.config.get<string>(
       'COMPLY_ADVANTAGE_BASE_URL',
       'https://api.complyadvantage.com',
@@ -57,57 +55,57 @@ export class ComplyAdvantageService {
     this.apiKey = this.config.get<string>('COMPLY_ADVANTAGE_API_KEY', '');
   }
 
-  /**
-   * Performs a name-based AML/sanctions/PEP search.
-   */
-  async search(params: ComplyAdvantageSearchParams): Promise<ComplyAdvantageSearchResult> {
-    if (!this.apiKey) {
-      this.logger.warn('ComplyAdvantage API key not configured — returning mock clear result');
-      return this.mockClearResult(params.name);
-    }
+  name(): string { return 'comply-advantage'; }
 
-    try {
-      const payload = {
-        search_term: params.name,
-        client_ref: `tpt-${Date.now()}`,
-        fuzziness: params.filters?.exactMatch ? 0 : 0.6,
-        filters: {
-          types: params.filters?.types ?? ['sanction', 'warning', 'fitness-probity', 'pep'],
-        },
-        ...(params.dateOfBirth ? { birth_year: params.dateOfBirth.substring(0, 4) } : {}),
-        ...(params.nationality ? { country_codes: [params.nationality] } : {}),
-      };
-
-      const response = await firstValueFrom(
-        this.http.post(`${this.baseUrl}/searches`, payload, {
-          headers: {
-            Authorization: `Token ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }),
-      );
-
-      return this.mapResponse(response.data as Record<string, unknown>);
-    } catch (err) {
-      this.logger.error(`ComplyAdvantage search failed: ${err}`);
-      return this.mockClearResult(params.name);
-    }
+  isConfigured(cfg: ConfigService): boolean {
+    return !!cfg.get('COMPLY_ADVANTAGE_API_KEY');
   }
 
-  /**
-   * Retrieves previous search results by ID (for audit / re-review).
-   */
-  async getSearch(searchId: string): Promise<ComplyAdvantageSearchResult> {
-    try {
-      const response = await firstValueFrom(
-        this.http.get(`${this.baseUrl}/searches/${searchId}`, {
-          headers: { Authorization: `Token ${this.apiKey}` },
-        }),
-      );
-      return this.mapResponse(response.data as Record<string, unknown>);
-    } catch {
-      return this.mockClearResult('unknown');
+  async search(params: ComplyAdvantageSearchParams): Promise<ComplyAdvantageSearchResult> {
+    if (!this.isConfigured(this.config)) {
+      this.logger.warn('ComplyAdvantage API key not configured — returning mock clear result');
+      return this.mockClearResult();
     }
+
+    const payload = {
+      search_term: params.name,
+      client_ref:  `tpt-${Date.now()}`,
+      fuzziness:   params.filters?.exactMatch ? 0 : 0.6,
+      filters: {
+        types: params.filters?.types ?? ['sanction', 'warning', 'fitness-probity', 'pep'],
+      },
+      ...(params.dateOfBirth ? { birth_year: params.dateOfBirth.substring(0, 4) } : {}),
+      ...(params.nationality ? { country_codes: [params.nationality] } : {}),
+    };
+
+    const data = await this.circuitBreaker.execute(() =>
+      firstValueFrom(
+        this.http.post<Record<string, unknown>>(
+          `${this.baseUrl}/searches`,
+          payload,
+          { headers: { Authorization: `Token ${this.apiKey}`, 'Content-Type': 'application/json' } },
+        ),
+      ).then((r) => r.data),
+    );
+
+    return this.mapResponse(data);
+  }
+
+  async getSearch(searchId: string): Promise<ComplyAdvantageSearchResult> {
+    if (!this.isConfigured(this.config)) {
+      return this.mockClearResult();
+    }
+
+    const data = await this.circuitBreaker.execute(() =>
+      firstValueFrom(
+        this.http.get<Record<string, unknown>>(
+          `${this.baseUrl}/searches/${searchId}`,
+          { headers: { Authorization: `Token ${this.apiKey}` } },
+        ),
+      ).then((r) => r.data),
+    );
+
+    return this.mapResponse(data);
   }
 
   isHighRiskJurisdiction(countryCode: string): boolean {
@@ -115,41 +113,32 @@ export class ComplyAdvantageService {
   }
 
   private mapResponse(data: Record<string, unknown>): ComplyAdvantageSearchResult {
-    const content = (data['content'] as Record<string, unknown>) ?? {};
-    const hits = (content['hits'] as Record<string, unknown>[]) ?? [];
+    const content    = (data['content'] as Record<string, unknown>) ?? {};
+    const hits       = (content['hits'] as Record<string, unknown>[]) ?? [];
+    const activeHits = hits.filter((h) => !(h['whitelisted'] as boolean));
 
-    const matches: ComplyAdvantageMatch[] = hits.map((hit) => ({
-      id: hit['doc']
+    const matches: ComplyAdvantageMatch[] = activeHits.map((hit) => ({
+      id:           hit['doc']
         ? (hit['doc'] as Record<string, unknown>)['id'] as string
         : String(hit['id']),
-      matchScore: (hit['score'] as number) ?? 0,
-      name: (hit['doc'] as Record<string, unknown>)?.['name'] as string ?? '',
-      types: ((hit['doc'] as Record<string, unknown>)?.['types'] as string[]) ?? [],
-      sources: ((hit['doc'] as Record<string, unknown>)?.['sources'] as string[]) ?? [],
-      fields: (hit['doc'] as Record<string, unknown>) ?? {},
-      isWhitelisted: (hit['whitelisted'] as boolean) ?? false,
-    })).filter((m) => !m.isWhitelisted);
-
-    const activeHits = hits.filter((h) => !(h['whitelisted'] as boolean));
-    const riskScore = activeHits.length > 0
-      ? Math.min(100, activeHits.length * 25)
-      : 0;
+      matchScore:   (hit['score'] as number) ?? 0,
+      name:         (hit['doc'] as Record<string, unknown>)?.['name'] as string ?? '',
+      types:        ((hit['doc'] as Record<string, unknown>)?.['types'] as string[]) ?? [],
+      sources:      ((hit['doc'] as Record<string, unknown>)?.['sources'] as string[]) ?? [],
+      fields:       (hit['doc'] as Record<string, unknown>) ?? {},
+      isWhitelisted: false,
+    }));
 
     return {
-      searchId: String(content['search_id'] ?? data['id'] ?? `search_${Date.now()}`),
-      totalHits: activeHits.length,
+      searchId:    String(content['search_id'] ?? data['id'] ?? `search_${Date.now()}`),
+      totalHits:   activeHits.length,
       matches,
-      riskScore,
+      riskScore:   activeHits.length > 0 ? Math.min(100, activeHits.length * 25) : 0,
       rawResponse: data,
     };
   }
 
-  private mockClearResult(name: string): ComplyAdvantageSearchResult {
-    return {
-      searchId: `mock_${Date.now()}`,
-      totalHits: 0,
-      matches: [],
-      riskScore: 0,
-    };
+  private mockClearResult(): ComplyAdvantageSearchResult {
+    return { searchId: `mock_${Date.now()}`, totalHits: 0, matches: [], riskScore: 0 };
   }
 }

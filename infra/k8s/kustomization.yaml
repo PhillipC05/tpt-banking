@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tpt-banking
+
+resources:
+  # Namespace must be first
+  - namespace.yaml
+  # Config
+  - configmap.yaml
+  - secret.yaml
+  # Infrastructure
+  - infra/postgres.yaml
+  - infra/redis.yaml
+  - infra/kafka.yaml
+  # Applications
+  - apps/api-gateway.yaml
+  - apps/banking-core.yaml
+  - apps/compliance.yaml
+  - apps/open-banking.yaml
+  - apps/investment-banking.yaml
+  - apps/pricing-engine.yaml
+  - apps/risk-analytics.yaml
+  - apps/regulatory-reporting.yaml
+  - apps/treasury.yaml
+  - apps/wealth-management.yaml
+  - apps/prime-brokerage.yaml
+  # Ingress
+  - ingress.yaml
+
+# Image tags are overridden at deploy time:
+#   kustomize edit set image tpt-banking/banking-core=tpt-banking/banking-core:1.2.3
+images:
+  - name: tpt-banking/api-gateway
+    newTag: latest
+  - name: tpt-banking/banking-core
+    newTag: latest
+  - name: tpt-banking/compliance
+    newTag: latest
+  - name: tpt-banking/open-banking
+    newTag: latest
+  - name: tpt-banking/investment-banking
+    newTag: latest
+  - name: tpt-banking/pricing-engine
+    newTag: latest
+  - name: tpt-banking/risk-analytics
+    newTag: latest
+  - name: tpt-banking/regulatory-reporting
+    newTag: latest
+  - name: tpt-banking/treasury
+    newTag: latest
+  - name: tpt-banking/wealth-management
+    newTag: latest
+  - name: tpt-banking/prime-brokerage
+    newTag: latest

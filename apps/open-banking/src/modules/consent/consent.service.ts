@@ -1,13 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OpenBankingConsent, ConsentStatus, ConsentType } from '@tpt/database';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service';
 
 @Injectable()
 export class ConsentService {
   constructor(
     @InjectRepository(OpenBankingConsent)
     private readonly consentRepo: Repository<OpenBankingConsent>,
+    @Optional() private readonly webhookDelivery?: WebhookDeliveryService,
   ) {}
 
   async findById(consentId: string): Promise<OpenBankingConsent> {
@@ -32,6 +34,14 @@ export class ConsentService {
     await this.consentRepo.update(consent.id, {
       status: ConsentStatus.REVOKED,
       revokedAt: new Date(),
+    });
+
+    // Fire-and-forget webhook delivery — does not block the revoke response
+    void this.webhookDelivery?.queueDelivery('consent.revoked', {
+      consentId,
+      clientId:  consent.clientId,
+      revokedBy,
+      revokedAt: new Date().toISOString(),
     });
 
     return this.findById(consentId);

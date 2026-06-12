@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body, Controller, Get, Headers, Param, Post, RawBodyRequest, Req, UnauthorizedException, UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { KycService } from './kyc.service';
 import { KycDocumentType } from '@tpt/database';
 import { JwtAuthGuard, Roles, RolesGuard, Role, CurrentUser, JwtPayload } from '@tpt/auth';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { HmacWebhookValidator, ApiKeyWebhookValidator } from '@tpt/integrations';
 
 class InitiateKycDto {
   @IsUUID() customerId!: string;
@@ -21,12 +26,18 @@ class ManualReviewDto {
   @IsOptional() @IsString() notes?: string;
 }
 
+const jumioValidator  = new HmacWebhookValidator({ signatureHeader: 'x-jumio-hmac-token' });
+const onfidoValidator = new ApiKeyWebhookValidator('x-sha2-signature');
+
 @ApiTags('KYC')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('kyc')
 export class KycController {
-  constructor(private readonly kycService: KycService) {}
+  constructor(
+    private readonly kycService: KycService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('initiate')
   @Roles(Role.TELLER, Role.COMPLIANCE_OFFICER, Role.ADMIN, Role.SUPER_ADMIN)
@@ -61,14 +72,33 @@ export class KycController {
   }
 
   @Post('webhook/jumio')
-  @ApiOperation({ summary: 'Jumio webhook callback (no auth — validate Jumio signature)' })
-  jumioWebhook(@Body() payload: Record<string, unknown>) {
+  @ApiOperation({ summary: 'Jumio webhook callback — validates HMAC-SHA256 signature' })
+  jumioWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() payload: Record<string, unknown>,
+  ) {
+    const secret = this.config.get<string>('JUMIO_WEBHOOK_SECRET', '');
+    if (secret) {
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(payload));
+      const valid   = jumioValidator.validate(req.headers as Record<string, string>, rawBody, secret);
+      if (!valid) throw new UnauthorizedException('Invalid Jumio webhook signature');
+    }
     return this.kycService.processJumioWebhook(payload);
   }
 
   @Post('webhook/onfido')
-  @ApiOperation({ summary: 'Onfido webhook callback (no auth — validate Onfido signature)' })
-  onfidoWebhook(@Body() payload: Record<string, unknown>) {
+  @ApiOperation({ summary: 'Onfido webhook callback — validates X-SHA2-Signature header' })
+  onfidoWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Body() payload: Record<string, unknown>,
+    @Headers('x-sha2-signature') signature: string,
+  ) {
+    const secret = this.config.get<string>('ONFIDO_WEBHOOK_TOKEN', '');
+    if (secret) {
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(payload));
+      const valid   = onfidoValidator.validate(req.headers as Record<string, string>, rawBody, secret);
+      if (!valid) throw new UnauthorizedException('Invalid Onfido webhook signature');
+    }
     return this.kycService.processOnfidoWebhook(payload);
   }
 }

@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tpt-banking-config
+  namespace: tpt-banking
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+
+  # Service ports
+  PORT: "3000"
+  API_GATEWAY_PORT: "3001"
+  COMPLIANCE_PORT: "3002"
+  OPEN_BANKING_PORT: "3003"
+  INVESTMENT_BANKING_PORT: "3004"
+  PRICING_ENGINE_PORT: "3005"
+  RISK_ANALYTICS_PORT: "3006"
+  REGULATORY_REPORTING_PORT: "3007"
+  TREASURY_PORT: "3008"
+  WEALTH_PORT: "3009"
+  PRIME_BROKERAGE_PORT: "3010"
+
+  # Internal service URLs (cluster-internal DNS)
+  BANKING_CORE_URL: "http://banking-core:3000"
+  COMPLIANCE_URL: "http://compliance:3002"
+  OPEN_BANKING_URL: "http://open-banking:3003"
+  INVESTMENT_BANKING_URL: "http://investment-banking:3004"
+  PRICING_ENGINE_URL: "http://pricing-engine:3005"
+  RISK_ANALYTICS_URL: "http://risk-analytics:3006"
+  REGULATORY_REPORTING_URL: "http://regulatory-reporting:3007"
+  TREASURY_URL: "http://treasury:3008"
+  WEALTH_MANAGEMENT_URL: "http://wealth-management:3009"
+  PRIME_BROKERAGE_URL: "http://prime-brokerage:3010"
+
+  # Infrastructure (use service names inside cluster)
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "tpt_banking"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  KAFKA_BROKERS: "kafka:9092"
+  VAULT_ADDR: "http://vault:8200"
+
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4318"
+  PROMETHEUS_PORT: "9464"
+
+  # CORS — set to your actual domain(s)
+  CORS_ORIGINS: "https://app.tptbanking.com"
+
+  # KYC provider toggle
+  KYC_PROVIDER: "jumio"

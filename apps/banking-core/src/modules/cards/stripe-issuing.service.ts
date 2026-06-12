@@ -1,18 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { CardType, CardNetwork } from '@tpt/database';
+import { CardType } from '@tpt/database';
+import { CircuitBreaker } from '@tpt/integrations';
 
-/**
- * Stripe Issuing adapter.
- * Wraps the Stripe SDK for card issuing operations.
- * Physical/virtual cards are created and managed via Stripe Issuing.
- * PAN, CVV, and PIN are NEVER returned to or stored by our application.
- */
 @Injectable()
 export class StripeIssuingService {
   private readonly logger = new Logger(StripeIssuingService.name);
   private readonly stripe: Stripe;
+  private readonly circuitBreaker = new CircuitBreaker('stripe-issuing');
 
   constructor(private readonly config: ConfigService) {
     this.stripe = new Stripe(this.config.getOrThrow<string>('STRIPE_SECRET_KEY'), {
@@ -32,22 +28,23 @@ export class StripeIssuingService {
       country: string;
     };
   }): Promise<{ cardholderId: string }> {
-    const cardholder = await this.stripe.issuing.cardholders.create({
-      name: params.name,
-      email: params.email,
-      phone_number: params.phone ?? undefined,
-      type: 'individual',
-      billing: {
-        address: {
-          line1: params.billingAddress.line1,
-          city: params.billingAddress.city,
-          state: params.billingAddress.state,
-          postal_code: params.billingAddress.postalCode,
-          country: params.billingAddress.country,
+    const cardholder = await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cardholders.create({
+        name:         params.name,
+        email:        params.email,
+        phone_number: params.phone ?? undefined,
+        type:         'individual',
+        billing: {
+          address: {
+            line1:       params.billingAddress.line1,
+            city:        params.billingAddress.city,
+            state:       params.billingAddress.state,
+            postal_code: params.billingAddress.postalCode,
+            country:     params.billingAddress.country,
+          },
         },
-      },
-    });
-
+      }),
+    );
     return { cardholderId: cardholder.id };
   }
 
@@ -65,57 +62,66 @@ export class StripeIssuingService {
     status: string;
   }> {
     const cardType = params.type === CardType.VIRTUAL ? 'virtual' : 'physical';
-
     const spendingControls: Stripe.Issuing.CardCreateParams.SpendingControls = {};
     if (params.spendingLimits?.length) {
       spendingControls.spending_limits = params.spendingLimits.map((limit) => ({
-        amount: Math.round(limit.amount * 100), // Stripe uses cents
+        amount:   Math.round(limit.amount * 100),
         interval: limit.interval,
       }));
     }
 
-    const card = await this.stripe.issuing.cards.create({
-      cardholder: params.cardholderId,
-      currency: params.currency.toLowerCase(),
-      type: cardType,
-      status: 'active',
-      spending_controls: spendingControls,
-    });
+    const card = await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cards.create({
+        cardholder:        params.cardholderId,
+        currency:          params.currency.toLowerCase(),
+        type:              cardType,
+        status:            'active',
+        spending_controls: spendingControls,
+      }),
+    );
 
     return {
       stripeCardId: card.id,
-      lastFour: card.last4,
-      expiryMonth: card.exp_month,
-      expiryYear: card.exp_year,
-      network: card.brand.toUpperCase(),
-      status: card.status,
+      lastFour:     card.last4,
+      expiryMonth:  card.exp_month,
+      expiryYear:   card.exp_year,
+      network:      card.brand.toUpperCase(),
+      status:       card.status,
     };
   }
 
   async freezeCard(stripeCardId: string): Promise<void> {
-    await this.stripe.issuing.cards.update(stripeCardId, { status: 'inactive' });
+    await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cards.update(stripeCardId, { status: 'inactive' }),
+    );
   }
 
   async unfreezeCard(stripeCardId: string): Promise<void> {
-    await this.stripe.issuing.cards.update(stripeCardId, { status: 'active' });
+    await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cards.update(stripeCardId, { status: 'active' }),
+    );
   }
 
   async cancelCard(stripeCardId: string): Promise<void> {
-    await this.stripe.issuing.cards.update(stripeCardId, { status: 'canceled' });
+    await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cards.update(stripeCardId, { status: 'canceled' }),
+    );
   }
 
   async updateSpendingLimits(
     stripeCardId: string,
     limits: { amount: number; interval: 'daily' | 'weekly' | 'monthly' }[],
   ): Promise<void> {
-    await this.stripe.issuing.cards.update(stripeCardId, {
-      spending_controls: {
-        spending_limits: limits.map((l) => ({
-          amount: Math.round(l.amount * 100),
-          interval: l.interval,
-        })),
-      },
-    });
+    await this.circuitBreaker.execute(() =>
+      this.stripe.issuing.cards.update(stripeCardId, {
+        spending_controls: {
+          spending_limits: limits.map((l) => ({
+            amount:   Math.round(l.amount * 100),
+            interval: l.interval,
+          })),
+        },
+      }),
+    );
   }
 
   /**

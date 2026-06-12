@@ -9,6 +9,8 @@ import { ObieModule } from './modules/obie/obie.module';
 import { Psd2Module } from './modules/psd2/psd2.module';
 import { FdxModule } from './modules/fdx/fdx.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { VrpModule } from './modules/vrp/vrp.module';
 
 @Module({
   imports: [
@@ -27,12 +29,14 @@ import { ClientsModule } from './modules/clients/clients.module';
       }),
       inject: [ConfigService],
     }),
+    WebhooksModule,
     ClientsModule,
     OAuth2Module,
     ConsentModule,
     ObieModule,
     Psd2Module,
     FdxModule,
+    VrpModule,
   ],
 })
 export class AppModule {}

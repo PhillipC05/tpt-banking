@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Post, Query, Res, HttpCode, HttpStatus,
+  Body, Controller, Get, Post, Query, Res, Headers, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -142,5 +142,16 @@ export class OAuth2Controller {
   async revoke(@Body() body: { token: string }) {
     await this.oauth2Service.revokeToken(body.token);
     return {};
+  }
+
+  // ── OIDC UserInfo endpoint — OIDC Core §5.3 ──────────────────────────────
+
+  @Get('userinfo')
+  @ApiOperation({
+    summary: 'UserInfo endpoint — OIDC Core §5.3',
+    description: 'Returns identity claims for the token subject. Token must have openid scope.',
+  })
+  getUserInfo(@Headers('authorization') authorization: string) {
+    return this.oauth2Service.getUserInfo(authorization);
   }
 }

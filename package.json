@@ -16,7 +16,10 @@
     "migration:generate": "ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js migration:generate -d packages/database/src/data-source.ts",
     "migration:revert": "ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js migration:revert -d packages/database/src/data-source.ts",
     "keys:generate": "mkdir -p keys && openssl genrsa -out keys/private.pem 4096 && openssl rsa -in keys/private.pem -pubout -out keys/public.pem && echo Keys generated",
-    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
+    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f",
+    "swagger:generate": "ts-node -r tsconfig-paths/register scripts/generate-swagger.ts",
+    "test:unit": "nx run-many --target=test --all --testPathPattern=__tests__(?!/integration)",
+    "test:integration": "DATABASE_NAME=tpt_banking_test nx test database --config=jest.config.ts"
   },
   "devDependencies": {
     "@nx/eslint": "^18.0.0",

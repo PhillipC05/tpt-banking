@@ -127,4 +127,24 @@ export class ObieController {
   getPaymentStatus(@Param('domesticPaymentId') paymentId: string) {
     return this.obieService.getPaymentStatus(paymentId);
   }
+
+  // ── Confirmation of Funds (CBPII / PSD2 Art.65) ───────────────────────────
+
+  @Post('cbpii/funds-confirmations')
+  @ApiOperation({
+    summary: 'Confirm funds availability — OBIE CBPII (PSD2 Art.65)',
+    description: 'Returns FundsAvailable: true/false. Requires ReadFundsConfirmations permission on consent.',
+  })
+  confirmFunds(
+    @Headers('authorization') authorization: string,
+    @Body() body: {
+      Data: {
+        ConsentId:        string;
+        Reference:        string;
+        InstructedAmount: { Amount: string; Currency: string };
+      };
+    },
+  ) {
+    return this.obieService.confirmFunds(authorization, body);
+  }
 }

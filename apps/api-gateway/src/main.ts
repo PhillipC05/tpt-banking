@@ -1,5 +1,8 @@
 import 'reflect-metadata';
+import { initTelemetry } from '@tpt/telemetry';
+initTelemetry('api-gateway');
 import { NestFactory } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
@@ -9,7 +12,25 @@ import { HttpExceptionFilter, GlobalValidationPipe, LoggingInterceptor } from '@
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  app.use(helmet());
+  const isProd = process.env['NODE_ENV'] === 'production';
+
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    hsts: isProd
+      ? { maxAge: 63_072_000, includeSubDomains: true, preload: true }
+      : false,
+    crossOriginEmbedderPolicy: true,
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  }));
   app.use(compression());
 
   const corsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3002').split(',');
@@ -20,6 +41,7 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Step-Up-Token'],
   });
 
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.useGlobalPipes(GlobalValidationPipe);
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());

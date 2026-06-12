@@ -22,8 +22,16 @@ export interface TokenResponse {
   token_type: 'Bearer';
   expires_in: number;
   refresh_token?: string;
+  id_token?: string;
   scope: string;
   consent_id?: string;
+}
+
+export interface OidcUserInfo {
+  sub:             string;
+  email?:          string;
+  name?:           string;
+  email_verified?: boolean;
 }
 
 export interface TokenIntrospection {
@@ -218,7 +226,8 @@ export class OAuth2Service {
     };
 
     if (payload.exp < Math.floor(Date.now() / 1000)) return { active: false };
-    if (payload.client_id !== clientId) return { active: false };
+    // Allow wildcard '*' for internal service calls (e.g. UserInfo endpoint)
+    if (clientId !== '*' && payload.client_id !== clientId) return { active: false };
 
     return {
       active: true,
@@ -227,6 +236,36 @@ export class OAuth2Service {
       scope: payload.scope,
       exp: payload.exp,
       consent_id: payload.consent_id,
+    };
+  }
+
+  async getUserInfo(authHeader: string): Promise<OidcUserInfo> {
+    const token = authHeader?.replace('Bearer ', '');
+    if (!token) throw new UnauthorizedException('Missing Bearer token');
+
+    const stored = await this.redis.get(`${TOKEN_PREFIX}${token}`);
+    if (!stored) throw new UnauthorizedException('Invalid or expired token');
+
+    const payload = JSON.parse(stored) as {
+      sub: string;
+      scope: string;
+      exp: number;
+      email?: string;
+      name?: string;
+    };
+
+    if (payload.exp < Math.floor(Date.now() / 1000)) {
+      throw new UnauthorizedException('Token expired');
+    }
+    if (!payload.scope.includes('openid')) {
+      throw new UnauthorizedException('Token does not have openid scope');
+    }
+
+    return {
+      sub:             payload.sub,
+      email:           payload.email,
+      name:            payload.name,
+      email_verified:  true,
     };
   }
 
@@ -262,14 +301,21 @@ export class OAuth2Service {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + client.accessTokenTtl;
 
+    const scopes      = consent.permissions.join(' ');
+    const includeOidc = consent.permissions.includes('openid');
+    const iss         = process.env['OPEN_BANKING_BASE_URL'] ?? 'http://localhost:3003';
+
     const tokenPayload = {
-      sub: consent.customerId ?? '',
-      client_id: client.clientId,
-      scope: consent.permissions.join(' '),
+      sub:        consent.customerId ?? '',
+      client_id:  client.clientId,
+      scope:      scopes,
       consent_id: consent.consentId,
-      jti: tokenId,
-      iat: now,
+      jti:        tokenId,
+      iat:        now,
       exp,
+      // Store user claims in Redis so UserInfo endpoint doesn't need a cross-service call
+      email: consent.riskData?.['email'] as string | undefined,
+      name:  consent.riskData?.['name']  as string | undefined,
     };
 
     // Store token payload in Redis (fast revocation, no DB lookup)
@@ -285,13 +331,31 @@ export class OAuth2Service {
       JSON.stringify({ consentId: consent.consentId, customerId: consent.customerId }),
     );
 
+    // Issue id_token (signed JWT) when openid scope is requested
+    let idToken: string | undefined;
+    if (includeOidc) {
+      idToken = this.jwtService.sign(
+        {
+          sub:            consent.customerId ?? '',
+          email:          tokenPayload.email,
+          name:           tokenPayload.name,
+          iss,
+          aud:            client.clientId,
+          nonce:          consent.riskData?.['nonce'] as string | undefined,
+          at_hash:        tokenId.slice(0, 16),
+        },
+        { expiresIn: client.accessTokenTtl },
+      );
+    }
+
     return {
-      access_token: tokenId, // opaque token — payload in Redis
-      token_type: 'Bearer',
-      expires_in: client.accessTokenTtl,
+      access_token:  tokenId, // opaque token — payload in Redis
+      token_type:    'Bearer',
+      expires_in:    client.accessTokenTtl,
       refresh_token: refreshTokenId,
-      scope: consent.permissions.join(' '),
-      consent_id: consent.consentId,
+      ...(idToken ? { id_token: idToken } : {}),
+      scope:         scopes,
+      consent_id:    consent.consentId,
     };
   }
 

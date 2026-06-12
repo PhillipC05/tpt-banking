@@ -1,7 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OpenBankingConsent, ConsentStatus, ConsentType, Account, LedgerEntry } from '@tpt/database';
+import { Money } from '@tpt/shared';
+import { PaymentBridgeService } from '../obie/payment-bridge.service';
+import { WebhookDeliveryService } from '../webhooks/webhook-delivery.service';
 
 /**
  * PSD2 / Berlin Group NextGenPSD2 resource server.
@@ -18,6 +21,8 @@ export class Psd2Service {
     private readonly accountRepo: Repository<Account>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
+    private readonly paymentBridge: PaymentBridgeService,
+    private readonly webhookDelivery: WebhookDeliveryService,
   ) {}
 
   async createConsent(
@@ -177,27 +182,62 @@ export class Psd2Service {
       remittanceInformationUnstructured?: string;
     },
   ): Promise<Record<string, unknown>> {
-    const paymentId = `PSD2-${Date.now()}`;
+    const { psd2PaymentId, status } = await this.paymentBridge.submitSepaPayment(body, requestId);
+
+    void this.webhookDelivery.queueDelivery('payment.pending', {
+      paymentId: psd2PaymentId,
+      status,
+    });
 
     return {
-      transactionStatus: 'RCVD',
-      paymentId,
+      transactionStatus: status,
+      paymentId: psd2PaymentId,
       _links: {
         scaRedirect: {
-          href: `${process.env['OPEN_BANKING_PORTAL_URL'] ?? 'http://localhost:3003'}/auth/payment?payment_id=${paymentId}`,
+          href: `${process.env['OPEN_BANKING_PORTAL_URL'] ?? 'http://localhost:3003'}/auth/payment?payment_id=${psd2PaymentId}`,
         },
-        self: { href: `/berlingroup/v1.3/payments/${paymentProduct}/${paymentId}` },
-        status: { href: `/berlingroup/v1.3/payments/${paymentProduct}/${paymentId}/status` },
+        self:   { href: `/berlingroup/v1.3/payments/${paymentProduct}/${psd2PaymentId}` },
+        status: { href: `/berlingroup/v1.3/payments/${paymentProduct}/${psd2PaymentId}/status` },
       },
     };
   }
 
   async getPaymentStatus(paymentId: string): Promise<Record<string, unknown>> {
-    return { paymentId, transactionStatus: 'ACSC' };
+    const obStatus = await this.paymentBridge.getPaymentStatus(paymentId);
+    const statusMap: Record<string, string> = {
+      AcceptedSettlementCompleted: 'ACSC',
+      AcceptedSettlementInProcess: 'ACSP',
+      Rejected:                    'RJCT',
+      Pending:                     'RCVD',
+    };
+    return { paymentId, transactionStatus: statusMap[obStatus] ?? 'ACSP' };
   }
 
   async getPaymentStatusOnly(paymentId: string): Promise<Record<string, unknown>> {
-    return { transactionStatus: 'ACSC' };
+    const { transactionStatus } = await this.getPaymentStatus(paymentId) as { transactionStatus: string };
+    return { transactionStatus };
+  }
+
+  async confirmFunds(
+    consentId: string,
+    body: {
+      account: { iban: string };
+      instructedAmount: { currency: string; amount: string };
+    },
+  ): Promise<Record<string, unknown>> {
+    const consent = await this.findActiveConsent(consentId);
+
+    const requested = new Money(body.instructedAmount.amount, body.instructedAmount.currency);
+
+    // Reverse synthetic IBAN to accountNumber: strip 'GB' prefix + leading zeros
+    const bban = body.account.iban.replace(/^GB0*/, '');
+    const account = await this.accountRepo.findOne({ where: { accountNumber: bban } });
+    if (!account) throw new BadRequestException(`Account with IBAN ${body.account.iban} not found`);
+
+    const available = Money.fromDecimalString(account.availableBalance, account.currency);
+    const fundsAvailable = available.amount.gte(requested.amount);
+
+    return { fundsAvailable };
   }
 
   private async findConsent(consentId: string): Promise<OpenBankingConsent> {

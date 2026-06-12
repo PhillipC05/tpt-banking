@@ -1,0 +1,81 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: banking-core
+    static_configs:
+      - targets: ['host.docker.internal:9464']
+    relabel_configs:
+      - target_label: service
+        replacement: banking-core
+
+  - job_name: api-gateway
+    static_configs:
+      - targets: ['host.docker.internal:9465']
+    relabel_configs:
+      - target_label: service
+        replacement: api-gateway
+
+  - job_name: compliance
+    static_configs:
+      - targets: ['host.docker.internal:9466']
+    relabel_configs:
+      - target_label: service
+        replacement: compliance
+
+  - job_name: open-banking
+    static_configs:
+      - targets: ['host.docker.internal:9467']
+    relabel_configs:
+      - target_label: service
+        replacement: open-banking
+
+  - job_name: investment-banking
+    static_configs:
+      - targets: ['host.docker.internal:9468']
+    relabel_configs:
+      - target_label: service
+        replacement: investment-banking
+
+  - job_name: pricing-engine
+    static_configs:
+      - targets: ['host.docker.internal:9469']
+    relabel_configs:
+      - target_label: service
+        replacement: pricing-engine
+
+  - job_name: risk-analytics
+    static_configs:
+      - targets: ['host.docker.internal:9470']
+    relabel_configs:
+      - target_label: service
+        replacement: risk-analytics
+
+  - job_name: regulatory-reporting
+    static_configs:
+      - targets: ['host.docker.internal:9471']
+    relabel_configs:
+      - target_label: service
+        replacement: regulatory-reporting
+
+  - job_name: treasury
+    static_configs:
+      - targets: ['host.docker.internal:9472']
+    relabel_configs:
+      - target_label: service
+        replacement: treasury
+
+  - job_name: wealth-management
+    static_configs:
+      - targets: ['host.docker.internal:9473']
+    relabel_configs:
+      - target_label: service
+        replacement: wealth-management
+
+  - job_name: prime-brokerage
+    static_configs:
+      - targets: ['host.docker.internal:9474']
+    relabel_configs:
+      - target_label: service
+        replacement: prime-brokerage

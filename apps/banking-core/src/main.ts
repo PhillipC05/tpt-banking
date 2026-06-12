@@ -1,5 +1,8 @@
 import 'reflect-metadata';
+import { initTelemetry } from '@tpt/telemetry';
+initTelemetry('banking-core');
 import { NestFactory, Reflector } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
@@ -12,8 +15,11 @@ import { RolesGuard } from '@tpt/auth';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'warn', 'error', 'debug'],
+    logger:  ['log', 'warn', 'error', 'debug'],
+    rawBody: true,
   });
+
+  const isProd = process.env['NODE_ENV'] === 'production';
 
   // Security middleware
   app.use(helmet({
@@ -23,8 +29,18 @@ async function bootstrap(): Promise<void> {
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:'],
         scriptSrc: ["'self'"],
+        frameAncestors: ["'none'"],
       },
     },
+    // HSTS: enforce HTTPS for 2 years in production
+    hsts: isProd
+      ? { maxAge: 63_072_000, includeSubDomains: true, preload: true }
+      : false,
+    crossOriginEmbedderPolicy: true,
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
   }));
   app.use(compression());
   app.use(cookieParser());
@@ -42,10 +58,11 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(GlobalValidationPipe);
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
+  // TraceInterceptor is registered via TelemetryModule (global) in AppModule
   app.useGlobalGuards(new RolesGuard(app.get(Reflector)));
 
-  // API versioning prefix
-  app.setGlobalPrefix('v1');
+  // URI versioning: routes at /v1/...; future v2 routes use @Version('2') on controllers
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   // Swagger
   const config = new DocumentBuilder()

@@ -9,6 +9,9 @@ import { AmlModule } from './modules/aml/aml.module';
 import { CasesModule } from './modules/cases/cases.module';
 import { SarModule } from './modules/sar/sar.module';
 import { CtrModule } from './modules/ctr/ctr.module';
+// Phase 3b
+import { CddModule } from './modules/cdd/cdd.module';
+import { EddModule } from './modules/edd/edd.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { CtrModule } from './modules/ctr/ctr.module';
     CasesModule,
     SarModule,
     CtrModule,
+    // Phase 3b
+    CddModule,
+    EddModule,
   ],
 })
 export class AppModule {}

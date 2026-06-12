@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { VaultCiphertextTransformer } from '@tpt/vault';
 
 /**
  * Customer lifecycle status.
@@ -84,11 +85,12 @@ export class Customer {
   dateOfBirth!: Date;
 
   /**
-   * AES-256-GCM encrypted Social Security Number.
-   * Null for non-US customers or when not collected.
+   * Vault-encrypted Social Security Number (AES-256-GCM96 via Transit engine).
+   * Stored as utf8 bytea containing the `vault:v1:...` ciphertext.
+   * Use VaultEncryptionService.encrypt/decrypt — never read/write plaintext directly.
    */
-  @Column({ name: 'ssn_encrypted', type: 'bytea', nullable: true })
-  ssnEncrypted!: Buffer | null;
+  @Column({ name: 'ssn_encrypted', type: 'bytea', nullable: true, transformer: VaultCiphertextTransformer })
+  ssnEncrypted!: string | null;
 
   /**
    * Last 4 digits of SSN stored in plaintext for identification purposes.
@@ -99,7 +101,11 @@ export class Customer {
   @Column({ type: 'varchar', length: 3 })
   nationality!: string;
 
-  @Column({ name: 'tax_id', type: 'varchar', length: 50, nullable: true })
+  /**
+   * Vault-encrypted tax ID (EIN/ITIN/foreign tax number).
+   * Stored as `vault:v1:...` ciphertext in bytea column.
+   */
+  @Column({ name: 'tax_id_encrypted', type: 'bytea', nullable: true, transformer: VaultCiphertextTransformer })
   taxId!: string | null;
 
   @Column({

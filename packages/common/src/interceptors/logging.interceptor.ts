@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
+import { trace } from '@opentelemetry/api';
 
 const PII_FIELDS = new Set([
   'password',
@@ -68,18 +69,20 @@ export class LoggingInterceptor implements NestInterceptor {
         next: () => {
           const response = http.getResponse<{ statusCode: number }>();
           const duration = Date.now() - startTime;
+          const traceId = trace.getActiveSpan()?.spanContext().traceId ?? '-';
           this.logger.log(
-            `${method} ${path} ${response.statusCode} +${duration}ms [${requestId}]`,
+            `${method} ${path} ${response.statusCode} +${duration}ms [${requestId}] trace=${traceId}`,
           );
         },
         error: (err: unknown) => {
           const duration = Date.now() - startTime;
+          const traceId = trace.getActiveSpan()?.spanContext().traceId ?? '-';
           const status =
             typeof err === 'object' && err !== null && 'statusCode' in err
               ? (err as { statusCode: number }).statusCode
               : 500;
           this.logger.warn(
-            `${method} ${path} ${status} +${duration}ms [${requestId}] ${err instanceof Error ? err.message : String(err)}`,
+            `${method} ${path} ${status} +${duration}ms [${requestId}] trace=${traceId} ${err instanceof Error ? err.message : String(err)}`,
           );
         },
       }),
